@@ -14,6 +14,7 @@ output:
 ```{r load-packages, message = FALSE}
 library(ggplot2)
 library(dplyr)
+library(ggmosaic)
 ```
 
 ### Load data
@@ -29,10 +30,11 @@ load("brfss2013.RData")
 
 ## Part 1: Data
 
-Since we do not have yet specific question about the dataset, let's first take a look at it :
+Since we do not have yet specific question about the dataset, let's first take a look at it. This is a huge dataset of 491775 obs. and 330 variables, we do not want to call the  `str` function as the output would be cumbersome.
 
 ```{r}
-str()
+dim.data.frame(brfss2013)
+View(brfss2013)
 ```
 
 
@@ -42,7 +44,39 @@ str()
 
 **Research question 1:**
 
+Looking at the BRFSS codebook, let's take for example the `numadult` variable.
+
+```{r}
+str(brfss2013$numadult)
+```
+
+It's a categorical variable distributed on 19 levels which denotes the number of adults living within a single household. Let's filter the null answers from the data and visualize the data in a contingency table :
+
+```{r}
+df <- brfss2013 %>% 
+  filter(!is.na(numadult))
+table(df$numadult)
+pt <- round(prop.table(table(df$numadult)), 3)
+pt
+plot(pt, type = "h") 
+summary(table(as.numeric(df$numadult)))
+```
+
+
+
+Another variable of interest is `employ1` which gives information about the professional activity of the subject.
+
+```{r}
+str(df$employ1)
+```
+
+
+How is distributed the professional activity within a single household? Is there a correlation between the number of adults living within a single household and the p ?
+
+
 **Research question 2:**
+
+General observation on how general health, happiness, sleep time and employment status are correlated.
 
 **Research question 3:**
 
@@ -51,27 +85,136 @@ str()
 
 ## Part 3: Exploratory data analysis
 
-NOTE: Insert code chunks as needed by clicking on the "Insert a new code chunk" 
-button (green button with orange arrow) above. Make sure that your code is visible
-in the project you submit. Delete this note when before you submit your work.
 
-**Research quesion 1:**
+**Research question 1:**
+
+At first, we want to examine the summary statistics for the data in question.
 
 ```{r}
+summary(as.numeric(df$numadult))
+
+```
+The majority of households contain 2 people with a mean of 1.809 people per household.
+
+
+We can then visualize the distribution of adults within households with a simple barplot.
+
+```{r}
+barplot(table(df$numadult))
+```
+
+
+A more interesting representation, to establish a relation between the two variables is a barplot filled by employment category.   
+
+```{r}
+ggplot(df, aes(x = numadult)) +
+   geom_bar(aes( fill = employ1)) +
+   labs(x = "Number of adults", y = "Proportion", title = "Adults in a single household")
+```
+
+
+After that, we visualize the same data with a standardized stacked bar plot, in which we can compare the relative size of the column proportions : it's easier for understanding the fraction of each professional activity category for number of adults in a household.
+
+```{r}
+ggplot(df, aes(x = numadult, fill = employ1)) +
+  geom_bar(position = "fill") + scale_y_continuous(labels = scales::percent) +
+  labs(x = "Number of adults", y = "Proportion", title = "Professional activity by number of adults in a single household")    
+
+```
+
+The first graph as a strongly positive skew distribution and the outliers are not showing at all (for example 1 entry with 45 people, one with 32). In fact households with more than 6 people are less than 0.01%. This kind of distribution is adapted to be transformed with a logarithmic transformation if we should have to use run a parametric test (e.g. for comparing two means). But this goes beyond the scope of this work.
+
+As we can easily notice from the second graph, the proportions of the different kind of professional activities vary between the groups, and sometimes they exhibit a clear pattern. For example, of the people living alone, the retired are the majority group constituting the 47%; proportion which generally decreases until we get to households composed of 9 people. Curiously, at ten the proportion peaks again (and maybe because this group represent peculiar structures). Since the proportion of the category of `employ1` is not the same between the groups of `numadult`, we can conclude that the two variables are associated.
+
+
+
+
+**Research question 2:**
+
+### Removing outliers
+
+Let's try to select four groups of variables,which represent four different columns in our data frame:
+
+```{r}
+ df2 <- brfss2013 %>%
+ select(children, sleptim1, employ1, genhlth) 
+
+l
+
+df2 %>%
+  group_by(employ1) %>%
+  summarise(meanchildren = mean(children, na.rm = TRUE), meansleep = mean(sleptim1, na.rm = TRUE), mean_health= mean(as.numeric(genhlth),na.rm=TRUE), count = n())
+```
+
+
+Some interesting observations can be made from this summary, e.g. the "healthier" people being by large the "Unable to work" group, the "least healhty" is the "student" group.
+
+If we analyze the summary statistics of the variables `children` and `sleptim1` we can find some extreme outliers. 
+
+```{r}
+summary(df2$children)
+summary(df2$sleptim1)
+
+## What does it happen if we try to plot an histogram ?
+ggplot(df2, aes(sleptim1)) +
+geom_histogram() 
+
+## Because of the outliers, The x coordinates extend to 500. If we want a meaningful representation, we have to zoom the graphic on the area of interest(0,24) with the `coord_cartesian()` function.
+
+ggplot(df2, aes(sleptim1, fill = employ1)) +
+geom_histogram(binwidth = 1) + coord_cartesian(c(3,12))
+```
+This summary statistic poses some doubts about the validity of the methodology of the interviews (maybe they were automated?). We have as high as 450 hours(or as low as 1 hour) per day of sleep and 47 children declared. This kind of data can be easily classified into the category of data entry errors (even if it is possible to have 45 children, it is impossible to sleep 450 hours per day and humanly impossible to sleep only 1.)  
+One way to identify outliers is to determine which points have a z-score that's higher than 3 and lower than -3 standard deviations. We can use the scores() function from Lukasz Komsta's `outliers` package to quickly calculate the z-score for every value in a specific column of our data frame.Let's try this cleaning operation on the `sleptim1` variable :
+
+```{r}
+library(outliers)
+
+
+d <- df2 %>%
+  filter(!is.na(sleptim1)) %>%
+  mutate(sleep_outlier_scores = scores(df2$sleptim1[!is.na(df2$sleptim1)])) %>%
+  filter(sleep_outlier_scores < 3 & sleep_outlier_scores > -3) 
+
+
+
+```
+
+After this cleaning operation we obtain a more reasonable summary, with hours of sleep ranging from 3 to 11:
+
+```{r}
+
+summary(d$sleptim1)
+ggplot(d, aes(sleptim1)) + 
+  geom_histogram(binwidth = 0.5)
+
+
+```
+We can now visualize the distribution of the hours of sleep between the `employment1` and the `genhlth` group of variables with different types of visualisations
+
+```{r}
+ggplot(d, aes(sleptim1, color = genhlth)) +
+  geom_freqpoly(linetype = 1, size = 1, binwidth = 1)
+
+ggplot(d, aes(sleptim1, color = employ1)) +
+  geom_freqpoly(linetype = 1, size = 1, binwidth = 1)
+
+ggplot(d, aes(sleptim1,fill = employ1)) +
+  geom_histogram(bins = 10, boundary = 3)
+
+ggplot(d, aes(sleptim1,fill = employ1)) +
+  geom_histogram(bins = 10, boundary = 3) + facet_wrap(~employ1)
+
+ggplot(d, aes(genhlth,fill = employ1)) +
+  geom_bar() + facet_wrap(~employ1)
+
+
+
 
 ```
 
 
-
-**Research quesion 2:**
-
-```{r}
-
-```
-
-
-
-**Research quesion 3:**
+**Research question 3:**
 
 ```{r}
 
