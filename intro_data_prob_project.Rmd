@@ -71,15 +71,16 @@ str(df$employ1)
 ```
 
 
-How is distributed the professional activity within a single household? Is there a correlation between the number of adults living within a single household and the p ?
+How is distributed the professional activity within a single household? Is there a correlation between the number of adults living within a single household and the most probable employment status ?
 
 
 **Research question 2:**
 
-General observation on how general health, happiness, sleep time and employment status are correlated.
+General observations on how general health, happiness, sleep time and employment status are correlated. What is the relationship between employment status and  hours of sleep? Or between employment status and general happiness? What we are going to do with extreme outliers? 
 
 **Research question 3:**
 
+Since we have concentrated our focus on the main variables of the data frame, we would like to explore the relationship between declared health and another variable which is related to the habit of smoking, `smokday2`. Today the effects of smoking on human health are acknowledged. How can we represent some of these effects from this data?
 
 * * *
 
@@ -88,23 +89,16 @@ General observation on how general health, happiness, sleep time and employment 
 
 **Research question 1:**
 
-At first, we want to examine the summary statistics for the data in question.
+### Distribution of adults per household
 
-```{r}
-summary(as.numeric(df$numadult))
-
-```
-The majority of households contain 2 people with a mean of 1.809 people per household.
-
-
-We can then visualize the distribution of adults within households with a simple barplot.
+The majority of households contain 2 people with a mean of 1.809 people per household. We can visualize the distribution of adults within households with a simple barplot.
 
 ```{r}
 barplot(table(df$numadult))
 ```
 
 
-A more interesting representation, to establish a relation between the two variables is a barplot filled by employment category.   
+A more interesting representation, to establish a relation between the two variables `numadult` and `employ1` is obtained with barplot filled by employment category.   
 
 ```{r}
 ggplot(df, aes(x = numadult)) +
@@ -112,6 +106,7 @@ ggplot(df, aes(x = numadult)) +
    labs(x = "Number of adults", y = "Proportion", title = "Adults in a single household")
 ```
 
+Each bar contains the relative proportion of the respective employment activity group. For example, we can see clearly that the majority of household with 1 adults are occupied by retired people.
 
 After that, we visualize the same data with a standardized stacked bar plot, in which we can compare the relative size of the column proportions : it's easier for understanding the fraction of each professional activity category for number of adults in a household.
 
@@ -122,9 +117,9 @@ ggplot(df, aes(x = numadult, fill = employ1)) +
 
 ```
 
-The first graph as a strongly positive skew distribution and the outliers are not showing at all (for example 1 entry with 45 people, one with 32). In fact households with more than 6 people are less than 0.01%. This kind of distribution is adapted to be transformed with a logarithmic transformation if we should have to use run a parametric test (e.g. for comparing two means). But this goes beyond the scope of this work.
+The first graph as a strongly positive skew distribution and the outliers are not showing at all (for example 1 entry with 45 people, one with 32). In fact households with more than 6 people are less than 0.01%. This kind of distribution could be adapted to be transformed with a logarithmic transformation in order to run parametric tests (e.g. for comparing two means). But this goes beyond the scope of this work. Or we could individuate and remove outliers, like we are going to do in the next section.
 
-As we can easily notice from the second graph, the proportions of the different kind of professional activities vary between the groups, and sometimes they exhibit a clear pattern. For example, of the people living alone, the retired are the majority group constituting the 47%; proportion which generally decreases until we get to households composed of 9 people. Curiously, at ten the proportion peaks again (and maybe because this group represent peculiar structures). Since the proportion of the category of `employ1` is not the same between the groups of `numadult`, we can conclude that the two variables are associated.
+As we can easily notice from the second graph, the proportions of the different kind of professional activities vary between the groups, and sometimes they exhibit a clear pattern. For example, of the people living alone, the retired are the majority group constituting the 47%; proportion which generally decreases until we get to households composed of 9 people. Curiously, at ten the proportion peaks again (and maybe because this group represent peculiar structures). Since the proportion of the category of `employ1` is not the same between the groups of `numadult`, we can conclude that the two variables are associated (even if to determine it we should run a chi squared test, which goes beyond the scope of this work.)
 
 
 
@@ -133,27 +128,20 @@ As we can easily notice from the second graph, the proportions of the different 
 
 ### Removing outliers
 
-Let's try to select four groups of variables,which represent four different columns in our data frame:
+Let's try to select three groups of variables,which represent four different columns in our data frame:
 
 ```{r}
  df2 <- brfss2013 %>%
  select(children, sleptim1, employ1, genhlth) 
 
-l
-
 df2 %>%
   group_by(employ1) %>%
-  summarise(meanchildren = mean(children, na.rm = TRUE), meansleep = mean(sleptim1, na.rm = TRUE), mean_health= mean(as.numeric(genhlth),na.rm=TRUE), count = n())
+  summarise(meansleep = mean(sleptim1, na.rm = TRUE), mediansleep = median(sleptim1, na.rm = TRUE), min= min(sleptim1, na.rm = TRUE), max = max(sleptim1, na.rm = TRUE), sd = sd(sleptim1, na.rm= TRUE), count = n())
 ```
-
-
-Some interesting observations can be made from this summary, e.g. the "healthier" people being by large the "Unable to work" group, the "least healhty" is the "student" group.
 
 If we analyze the summary statistics of the variables `children` and `sleptim1` we can find some extreme outliers. 
 
 ```{r}
-summary(df2$children)
-summary(df2$sleptim1)
 
 ## What does it happen if we try to plot an histogram ?
 ggplot(df2, aes(sleptim1)) +
@@ -164,6 +152,7 @@ geom_histogram()
 ggplot(df2, aes(sleptim1, fill = employ1)) +
 geom_histogram(binwidth = 1) + coord_cartesian(c(3,12))
 ```
+
 This summary statistic poses some doubts about the validity of the methodology of the interviews (maybe they were automated?). We have as high as 450 hours(or as low as 1 hour) per day of sleep and 47 children declared. This kind of data can be easily classified into the category of data entry errors (even if it is possible to have 45 children, it is impossible to sleep 450 hours per day and humanly impossible to sleep only 1.)  
 One way to identify outliers is to determine which points have a z-score that's higher than 3 and lower than -3 standard deviations. We can use the scores() function from Lukasz Komsta's `outliers` package to quickly calculate the z-score for every value in a specific column of our data frame.Let's try this cleaning operation on the `sleptim1` variable :
 
@@ -190,33 +179,64 @@ ggplot(d, aes(sleptim1)) +
 
 
 ```
-We can now visualize the distribution of the hours of sleep between the `employment1` and the `genhlth` group of variables with different types of visualisations
+
+We can now visualize the distribution of the hours of sleep between the `employment1` and the `genhlth` group of variables with different types of visualizations:
 
 ```{r}
-ggplot(d, aes(sleptim1, color = genhlth)) +
-  geom_freqpoly(linetype = 1, size = 1, binwidth = 1)
 
 ggplot(d, aes(sleptim1, color = employ1)) +
-  geom_freqpoly(linetype = 1, size = 1, binwidth = 1)
+  geom_freqpoly(linetype = 1, size = 1, binwidth = 1) 
 
 ggplot(d, aes(sleptim1,fill = employ1)) +
-  geom_histogram(bins = 10, boundary = 3)
+  geom_histogram(bins = 10, boundary = 3) + facet_wrap(~employ1, scales = "free")
 
 ggplot(d, aes(sleptim1,fill = employ1)) +
-  geom_histogram(bins = 10, boundary = 3) + facet_wrap(~employ1)
+  geom_histogram(binwidth = 1) + labs(title = "2")
 
-ggplot(d, aes(genhlth,fill = employ1)) +
-  geom_bar() + facet_wrap(~employ1)
-
-
+ggplot(d, aes(genhlth, fill = employ1)) +
+  geom_bar() + coord_flip()
 
 
+
+
+
+
+
+```
+From the graphs we can obtain several useful information, which for categorical variables would be harder to extract from just summary statistics: 
+
+* Graph 1, frequency polygon : The majority of the sample is constituted by "employed for wages", followed by retired people, self employed and so on. The most common sleep time for the groups is given by the highest vertexes.
+
+* The most common health condition is "very good", in which the majority group is represented by the "employed for wages"
+
+* In the "poor" category, the majority group is represented, and it comes not as a surprise, by the "unable to work". This group also has the lowest mean of hours of sleep (as we have already seen from the table), the highest being found among retired people.
+
+* Over the 50% quartile of the `sleptim1` the majority group are the "retired".
+
+```{r}
+ d %>%
+ filter(sleptim1 > 7) %>%
+ group_by(employ1) %>%
+ count()
 ```
 
 
 **Research question 3:**
 
-```{r}
+Let's first see the percentage of smokers from the sample population, from the computed variable `X_smoker3` :
 
+```{r}
+brfss2013 %>%
+  count(X_smoker3) %>%
+  mutate(p = round((n / sum(n)), 2))
+```
+We see that roughly half of the sample population $\sim 53 \% $ has never smoked. Let's compare the declared health condition with the variable, representing the result with a mosaic graphic :
+
+```{r}
+brfss2013 %>%
+  filter(!is.na(X_smoker3), !is.na(genhlth)) %>%
+  ggplot() +
+  geom_mosaic(aes(x = product(X_smoker3), fill=genhlth)) + coord_flip()
 ```
 
+We can observe a clear negative tendency between smoking habit and the "excellent" health condition (the relative proportion of the people in excellent health between each group is decreasing from top to bottom), and an inverse tendency for the "poor" condition. Even if these tendencies are less evident for other variables, the variables are clearly associated.
