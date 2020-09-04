@@ -1,5 +1,7 @@
 ---
-title: "Exploring the BRFSS data"
+title: "Exploring the BRFSS data - main variables and smoking habit "
+author: "Emanuele Messori"
+date: "02 September 2020"
 output: 
   html_document: 
     fig_height: 4
@@ -24,11 +26,23 @@ library(ggmosaic)
 load("brfss2013.RData")
 ```
 
-
-
 * * *
 
 ## Part 1: Data
+
+### Behavioural Risk Factor Surveillance System
+
+The BRFSS is a state-based survey started in 1984 by the Centers for Disease Control and Prevention(CDC). The objective is to collect information about adult U.S. residents "regarding their risk behaviors and preventive health practices that can affect their health status".
+
+*	Observation are collected monthly through phone calls interviews , both to landlines and to cellular telephones. 
+
+*	The interviews are collected independently state by state and are reviewed by state statisticians . Different sampling methods  are possible and are chosen contextually.
+
+*	Sampling is then divided into landline sampling (80%), in which +18 inhabitants of the same household(which was previously investigated)  are randomly selected. Cellular respondents(20%) are weighted as single adult households.
+
+*	"Data weighting" is used to remove all possible bias from the collected samples.
+
+*	This is an observational study, as the data is randomly collected through telephone calls through contextually chosen sample methodologies (the goal is at least 4000 interviews per state). This methodology ensures the generalizability of the results to the U.S. population. On the contrary, while we can establish some correlations between variables, causation cannot be inferred.
 
 Since we do not have yet specific question about the dataset, let's first take a look at it. This is a huge dataset of 491775 obs. and 330 variables, we do not want to call the  `str` function as the output would be cumbersome.
 
@@ -36,7 +50,7 @@ Since we do not have yet specific question about the dataset, let's first take a
 dim.data.frame(brfss2013)
 View(brfss2013)
 ```
-
+Refer to the BRFSS codebook for more information about the variables.
 
 * * *
 
@@ -55,11 +69,12 @@ It's a categorical variable distributed on 19 levels which denotes the number of
 ```{r}
 df <- brfss2013 %>% 
   filter(!is.na(numadult))
-table(df$numadult)
-pt <- round(prop.table(table(df$numadult)), 3)
-pt
-plot(pt, type = "h") 
-summary(table(as.numeric(df$numadult)))
+
+df %>%
+  count(numadult) %>%
+  mutate( p = round(n / sum(n), 3))
+
+
 ```
 
 
@@ -94,7 +109,8 @@ Since we have concentrated our focus on the main variables of the data frame, we
 The majority of households contain 2 people with a mean of 1.809 people per household. We can visualize the distribution of adults within households with a simple barplot.
 
 ```{r}
-barplot(table(df$numadult))
+ggplot(df, aes(numadult)) +
+  geom_bar()
 ```
 
 
@@ -117,7 +133,7 @@ ggplot(df, aes(x = numadult, fill = employ1)) +
 
 ```
 
-The first graph as a strongly positive skew distribution and the outliers are not showing at all (for example 1 entry with 45 people, one with 32). In fact households with more than 6 people are less than 0.01%. This kind of distribution could be adapted to be transformed with a logarithmic transformation in order to run parametric tests (e.g. for comparing two means). But this goes beyond the scope of this work. Or we could individuate and remove outliers, like we are going to do in the next section.
+The first graph has a strongly positive skew distribution and the outliers are not showing at all (for example 1 entry with 45 people, one with 32). In fact households with more than 6 people are less than 0.01%. This kind of distribution could be adapted to be transformed with a logarithmic transformation in order to run parametric tests (e.g. for comparing two means). But this goes beyond the scope of this work. Or we could individuate and remove outliers, like we are going to do in the next section.
 
 As we can easily notice from the second graph, the proportions of the different kind of professional activities vary between the groups, and sometimes they exhibit a clear pattern. For example, of the people living alone, the retired are the majority group constituting the 47%; proportion which generally decreases until we get to households composed of 9 people. Curiously, at ten the proportion peaks again (and maybe because this group represent peculiar structures). Since the proportion of the category of `employ1` is not the same between the groups of `numadult`, we can conclude that the two variables are associated (even if to determine it we should run a chi squared test, which goes beyond the scope of this work.)
 
@@ -136,19 +152,19 @@ Let's try to select three groups of variables,which represent four different col
 
 df2 %>%
   group_by(employ1) %>%
-  summarise(meansleep = mean(sleptim1, na.rm = TRUE), mediansleep = median(sleptim1, na.rm = TRUE), min= min(sleptim1, na.rm = TRUE), max = max(sleptim1, na.rm = TRUE), sd = sd(sleptim1, na.rm= TRUE), count = n())
+  summarise(meansleep = mean(sleptim1, na.rm = TRUE), mediansleep = median(sleptim1, na.rm = TRUE), minsl= min(sleptim1, na.rm = TRUE), maxsl = max(sleptim1, na.rm = TRUE), sd = sd(sleptim1, na.rm= TRUE), count = n())
 ```
 
-If we analyze the summary statistics of the variables `children` and `sleptim1` we can find some extreme outliers. 
+If we analyze the summary statistics of `sleptim1` we can find some extreme outliers. What does it happen if we try to plot an histogram ?
 
 ```{r}
-
-## What does it happen if we try to plot an histogram ?
 ggplot(df2, aes(sleptim1)) +
 geom_histogram() 
+```
 
-## Because of the outliers, The x coordinates extend to 500. If we want a meaningful representation, we have to zoom the graphic on the area of interest(0,24) with the `coord_cartesian()` function.
+Because of the outliers, The x coordinates extend to 500. If we want a meaningful representation, we have to zoom the graphic on the area of interest(0,24) with the `coord_cartesian()` function.
 
+```{r}
 ggplot(df2, aes(sleptim1, fill = employ1)) +
 geom_histogram(binwidth = 1) + coord_cartesian(c(3,12))
 ```
@@ -197,12 +213,8 @@ ggplot(d, aes(genhlth, fill = employ1)) +
   geom_bar() + coord_flip()
 
 
-
-
-
-
-
 ```
+
 From the graphs we can obtain several useful information, which for categorical variables would be harder to extract from just summary statistics: 
 
 * Graph 1, frequency polygon : The majority of the sample is constituted by "employed for wages", followed by retired people, self employed and so on. The most common sleep time for the groups is given by the highest vertexes.
@@ -230,7 +242,8 @@ brfss2013 %>%
   count(X_smoker3) %>%
   mutate(p = round((n / sum(n)), 2))
 ```
-We see that roughly half of the sample population $\sim 53 \% $ has never smoked. Let's compare the declared health condition with the variable, representing the result with a mosaic graphic :
+
+We see that roughly half of the sample population $\sim 53\%$ has never smoked. Let's compare the declared health condition with the variable, representing the result with a mosaic graphic :
 
 ```{r}
 brfss2013 %>%
@@ -240,3 +253,9 @@ brfss2013 %>%
 ```
 
 We can observe a clear negative tendency between smoking habit and the "excellent" health condition (the relative proportion of the people in excellent health between each group is decreasing from top to bottom), and an inverse tendency for the "poor" condition. Even if these tendencies are less evident for other variables, the variables are clearly associated.
+
+* * *
+
+Source for data cleaning :
+
+[Data Cleaning Challenge: Outliers](https://www.kaggle.com/studentar/data-cleaning-challenge-outliers-r) on Kaggle
