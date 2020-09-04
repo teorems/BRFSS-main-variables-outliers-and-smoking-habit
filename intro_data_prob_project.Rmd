@@ -1,12 +1,14 @@
 ---
-title: "Exploring the BRFSS data - main variables and smoking habit "
+title: 'Exploring the BRFSS data - main variables and smoking habit '
 author: "Emanuele Messori"
 date: "02 September 2020"
-output: 
-  html_document: 
+output:
+  html_document:
     fig_height: 4
     highlight: pygments
     theme: spacelab
+  pdf_document: default
+  word_document: default
 ---
 
 ## Setup
@@ -144,7 +146,7 @@ As we can easily notice from the second graph, the proportions of the different 
 
 ### Removing outliers
 
-Let's try to select three groups of variables,which represent four different columns in our data frame:
+Let's try to select three groups of variables,which represent three different columns in our data frame:
 
 ```{r}
  df2 <- brfss2013 %>%
@@ -169,7 +171,7 @@ ggplot(df2, aes(sleptim1, fill = employ1)) +
 geom_histogram(binwidth = 1) + coord_cartesian(c(3,12))
 ```
 
-This summary statistic poses some doubts about the validity of the methodology of the interviews (maybe they were automated?). We have as high as 450 hours(or as low as 1 hour) per day of sleep and 47 children declared. This kind of data can be easily classified into the category of data entry errors (even if it is possible to have 45 children, it is impossible to sleep 450 hours per day and humanly impossible to sleep only 1.)  
+The previous summary statistics pose some doubts about the validity of the methodology of the interviews (maybe they were automated?). We have as high as 450 hours(or as low as 1 hour) per day of sleep and 47 children declared. This kind of data can be easily classified into the category of data entry errors (even if it is possible to have 45 children, it is impossible to sleep 450 hours per day and humanly impossible to sleep only 1.)  
 One way to identify outliers is to determine which points have a z-score that's higher than 3 and lower than -3 standard deviations. We can use the scores() function from Lukasz Komsta's `outliers` package to quickly calculate the z-score for every value in a specific column of our data frame.Let's try this cleaning operation on the `sleptim1` variable :
 
 ```{r}
